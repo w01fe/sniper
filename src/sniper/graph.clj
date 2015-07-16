@@ -6,7 +6,9 @@
    [clojure.pprint :as pprint]
    [clojure.set :as set]
    [schema.core :as s]
-   [sniper.core :as sniper]))
+   [sniper.core :as sniper])
+  (:import
+   [java.util Map HashMap LinkedHashMap Stack]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Protocol
@@ -41,7 +43,7 @@
    refs))
 
 (defn dfs [init f]
-  (let [visited (java.util.LinkedHashMap.)]
+  (let [visited (LinkedHashMap.)]
     ((fn visit [n]
        (when-not (.get visited n)
          (.put visited n true)
@@ -49,6 +51,48 @@
            (visit c))))
      init)
     (vec (keys visited))))
+
+(defn scc-graph
+  "Take an edge list and return [edge-list node-set-map] for graph of sccs.
+   Pretends every node has self-loop.  Clusters returned will be in topological order.
+
+   ex: (= (scc-graph [[1 2] [2 3] [2 4] [4 2]])
+          [[([0 1] [0 0] [1 2] [1 1] [2 2]) ; meta-edges
+           {0 (1), 1 (2 4), 2 (3)}]])       ; meta-nodes --> old nodes"
+  [edges]
+  (let [edges (distinct (concat edges (map (fn [x] [x x]) (apply concat edges))))
+        pe (merge (into {} (map vector (map second edges) (repeat nil)))
+                  (map-vals #(map second %) (group-by first edges)))
+        e  (HashMap. ^Map pe)
+        re (HashMap. ^Map (map-vals #(map first %) (group-by second edges)))
+        s (Stack.)]
+    (while (not (.isEmpty e))
+      ((fn dfs1 [n]
+         (when (.containsKey e n)
+           (let [nns (.get e n)]
+             (.remove e n)
+             (doseq [nn nns] (dfs1 nn)))
+           (.push s n)))
+       (first (keys e))))
+    (let [sccs (into (sorted-map)
+                     (indexed
+                      (remove empty?
+                              (for [n (reverse (seq s))]
+                                ((fn dfs2 [n]
+                                   (when (.containsKey re n)
+                                     (let [nns (.get re n)]
+                                       (.remove re n)
+                                       (cons n (apply concat (doall (map dfs2 nns)))))))
+                                 n)))))
+          rev-sccs (into {} (for [[k vs] sccs, v vs] [v k]))]
+      [(distinct
+        (for [[scc nodes] sccs
+              node nodes
+              outgoing (get pe node)
+              :let [n-scc (get rev-sccs outgoing),
+                    _     (assert (<= scc n-scc))]]
+          [scc n-scc]))
+       sccs])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Implementation
@@ -61,7 +105,8 @@
      referers :- RefMap]
   PDependencyGraph
 
-  (forms [this] forms)
+  (forms [this]
+    (sort-by (comp (juxt :file :line) :source-info) forms))
 
   (add-form [this f]
     (DependencyGraph.
@@ -126,13 +171,12 @@
   ([forms]
      (reduce add-form (dependency-graph) forms)))
 
-(defn pretty-graph [g]
-  (sort-by (comp (juxt :file :line) :source-info) (:forms g)))
-
-(def pprint-graph (comp pprint/pprint pretty-graph))
+(def pprint-graph (comp pprint/pprint forms))
 
 (defmethod print-method DependencyGraph [g writer]
-  (print-method (pretty-graph g) writer))
+  (print-method (forms g) writer))
+
+
 
 
 (comment
