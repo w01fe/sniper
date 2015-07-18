@@ -41,7 +41,7 @@
                    (let [filename (str res)
                          path     (.getPath res)]
                      (when-not (get-in (env/deref-env) [::analyzed-clj path])
-                       (binding [*ns*   *ns*
+                       (binding [*ns*   (the-ns 'api.deploy) #_*ns*
                                  *file* filename]
                          (with-open [rdr (java-io/reader res)]
                            (let [pbr (reader-types/indexing-push-back-reader
@@ -51,14 +51,20 @@
                                  read-opts (if (.endsWith filename "cljc")
                                              (assoc read-opts :read-cond :allow)
                                              read-opts)]
-                             (loop []
+                             (loop [ret []]
                                (let [form (reader/read read-opts pbr)]
-                                 (when-not (identical? form eof)
-                                   (swap! env/*env* update-in [::analyzed-clj path]
-                                          (fnil conj [])
-                                          (jvm/analyze+eval form (assoc env :ns (ns-name *ns*)) opts))
-                                   (recur))))))))
-                     (get-in @env/*env* [::analyzed-clj path]))))))
+                                 (if (identical? form eof)
+                                   ret
+                                   (recur
+                                    (conj ret (jvm/analyze form (assoc env :ns (ns-name *ns*)) opts))))))
+                             #_(loop []
+                                 (let [form (reader/read read-opts pbr)]
+                                   (when-not (identical? form eof)
+                                     (swap! env/*env* update-in [::analyzed-clj path]
+                                            (fnil conj [])
+                                            (jvm/analyze+eval form (assoc env :ns (ns-name *ns*)) opts))
+                                     (recur))))))))
+                     #_(get-in @env/*env* [::analyzed-clj path]))))))
 
 (defn analyze-ns
   "Analyzes a whole namespace."
