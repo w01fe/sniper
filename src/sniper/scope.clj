@@ -1,6 +1,7 @@
 (ns sniper.scope
   (:use plumbing.core)
   (:require
+   [schema.core :as s]
    [sniper.core :as sniper]
    [sniper.snarf :as snarf]
    [sniper.graph :as graph]))
@@ -21,24 +22,35 @@
 ;; todo: figure out how to handle mutating forms, currently prevent
 ;;   removal of anything dynamically extended.
 ;;   (they need to count as definitions also)
-
-;; TODO: pick cycle-breakers, such that every node
-;;   has some ancestor in the initial stack.
-;;   (but put them after leaves, and mark them).
-;; so actually we want to construct scc-graph and choose
-;; a suitable element from each leaf SCC.
-
-;; TODO: keep type of node/edge in stack.
+;; (this may be solved by treating them as shadow).
 
 ;; TODO: shamalan-mode, coloring for strong set, depth in scc-graph.
 ;; for things in strong setk see centrality and roots.
 
 ;; TODO: orphaned test forms
 
+(defn prepare-forms [forms]
+  (for [f forms]
+    (if (empty? (sniper/definitions f))
+      (assoc f :shadow? true)
+      f)))
+
+(s/defschema KillableForm
+  {:type (s/enum :leaf :leaf-cycle :collatoral)
+   :form sniper/Form
+   (s/optional-key :cause) (s/named sniper/Form "Killed form that made this collatoral")})
+
+(s/defschema State
+  "State of the sniping process."
+  {:graph sniper.graph.DependencyGraph
+   :add-strong! (s/=> s/Any sniper/Form)
+   :stack [KillableForm]})
+
 (def +state+ (atom nil))
 
 (defn aim []
-  (map #(select-keys % [:var-defs :class-defs]) (:stack @+state+))
+  (map (fn-> (update :form sniper/definitions) (update-in-when [:cause] sniper/definitions))
+       (:stack @+state+))
   #_(concat (first (:stack @+state+))))
 
 (defn start! [forms strong-ref? add-strong!]
@@ -49,17 +61,19 @@
      +state+
      {:graph g
       :add-strong! add-strong!
-      :stack (filter #(and (graph/unused? g %)
-                           (not (sniper/shadow? %))
-                           (seq (sniper/definitions %)))
-                     (graph/forms g))}))
+      :stack (keep
+              (fn [forms]
+                (when-let [f (first (filter #(seq (sniper/definitions %)) forms))]
+                  {:form f
+                   :type (if (next forms) :leaf-cycle :leaf)}))
+              (graph/leaf-components g))}))
   (aim))
 
 (defn spare! []
   (letk [[graph add-strong! stack :as state] @+state+
-         form (first stack)
+         form (safe-get (first stack) :form)
          defs (sniper/definitions form)]
-    (doseq [d defs]) (add-strong! form)
+    (doseq [d defs] (add-strong! d))
     (reset! +state+
             (assoc state
               :graph (reduce graph/strongify graph defs)
@@ -68,14 +82,27 @@
 
 (defn fired! []
   (letk [[graph stack :as state] @+state+
-         form (first stack)
+         form (:form (first stack))
          new-g (graph/remove-form graph form)]
     (reset! +state+
             (assoc state
               :graph new-g
-              :stack (distinct
+              :stack (distinct-by
+                      :form
                       (concat
-                       (next (graph/ancestors graph form))
-                       (filter #(graph/unused? new-g %) (graph/callees graph form))
+                       (for [f (next (graph/ancestors graph form))]
+                         {:type :collatoral
+                          :form f
+                          :cause form})
+                       ;; TODO: this won't find new leaf cycles, for now just assume you restart
+                       ;; now and again for that purpose.
+                       (keep #(when (graph/unused? new-g %)
+                                {:type :leaf :form %})
+                             (graph/callees graph form))
                        (next stack))))))
   (aim))
+
+(comment
+  (def f (mapcat sniper.snarf/ns-forms '[sniper.graph sniper.core sniper.scope]))
+  (sniper.scope/start! (sniper.scope/prepare-forms f) (constantly false) (constantly nil))
+  )

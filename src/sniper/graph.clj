@@ -165,6 +165,19 @@
   [g f]
   (every? sniper/shadow? (callers g f)))
 
+(s/defn leaf-components :- [[sniper/Form]]
+  "A list of strongly connected non-shadow leaf components."
+  [g]
+  (let [[scc-edges scc-nodes] (->> g
+                                   forms
+                                   (remove sniper/shadow?)
+                                   (mapcat (fn [f] (for [c (callees g f)] [f c])))
+                                   scc-graph)
+        non-loop-scc-edges (remove (fn [[s d]] (= s d)) scc-edges)
+        leaf-sccs (apply disj (set (map first non-loop-scc-edges))
+                         (map second non-loop-scc-edges))]
+    (map #(safe-get scc-nodes %) leaf-sccs)))
+
 
 (defn dependency-graph
   ([] (->DependencyGraph #{} {} {}))
