@@ -19,6 +19,11 @@
 ;; Copied from tools.analyzer.jvm master for EOF fix.
 ;; also modified to take file.
 
+(defn try-analyze [form env opts]
+  (try (jvm/analyze form env opts)
+       (catch Throwable t
+         (println t)
+         (println "WARNING: skipping form: " form))))
 
 (defn analyze-ns
   "Analyzes a whole namespace. returns a vector of the ASTs for all the
@@ -54,11 +59,11 @@
                                              read-opts)]
                              (loop [ret []]
                                (let [form (reader/read read-opts pbr)]
+                                 ;;(println "\n\n" form)
                                  (if (identical? form eof)
-                                   ret
+                                   (remove nil? ret)
                                    (recur
-                                    (conj ret (jvm/analyze form (assoc env :ns (ns-name *ns*)) opts)))))))))))))))
-
+                                    (conj ret (try-analyze form (assoc env :ns (ns-name *ns*)) opts)))))))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Private helpers: extracting definitions and references from forms
@@ -73,7 +78,6 @@
   (when (= (:type node) :class) (-> node :raw-forms first)))
 
 (defnk class-defs
-  "TODO: Currently works for types but not interfaces or records."
   [op :as node]
   (case op
     (:deftype) [(class-name (safe-get node :class-name))]
@@ -99,13 +103,15 @@
   (case op
     (:def) [(var->symbol (safe-get node :var))]
     (:const) (-> node protocol-gen-interface-form (defprotocol-vars (safe-get-in node [:env :ns])))
+    (:instance-call) (when (and (= 'addMethod (:method node)) ;; defmethod is part of multi var def.
+                                (= clojure.lang.MultiFn (:class node)))
+                       [(var->symbol (safe-get-in node [:instance :var]))])
     nil))
 
 (defnk var-refs [op :as node]
   (case op
     (:var :the-var) [(var->symbol (safe-get node :var))]
     nil))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Public
@@ -125,9 +131,18 @@
        :var-refs (unique var-refs)
        :shadow? false})))
 
+(defonce +analysis-cache+ (atom (read-string (slurp "/Users/w01fe/analysis.clj"))) #_(atom {}))
+
+(defn cached-ns-forms [ns]
+  (let [c (slurp (jvm-utils/ns-url ns))]
+    (or (@+analysis-cache+ c)
+        (let [res (vec (keep normalized-form (analyze-ns ns)))]
+          (swap! +analysis-cache+ assoc c res)
+          res))))
+
 (s/defn ns-forms :- [sniper/Form]
   [& nss :- [clojure.lang.Symbol]]
-  (keep normalized-form (apply concat (map analyze-ns nss))))
+  (apply concat (pmap cached-ns-forms nss)))
 
 
 (defn classpath-namespaces [dir-regex]
@@ -143,24 +158,13 @@
 
 (defn classpath-ns-forms [dir-regex]
   (let [nss (classpath-namespaces dir-regex)]
-    (doseq [ns nss]
-      (println "Requiring" ns)
-      (require ns))
-    )
-  )
+    (println "Requiring" nss)
+    (apply require nss)
+    (apply ns-forms nss)))
+
 
 (comment
-  (let [namespaces (sort )]
-    ;; (doseq [i init] (println "requiring" i) (require i))
-    (apply require namespaces)
-    (run-tests-selector test-selector (preprocess-nss namespaces))))
-
-;; TODO: get all files on classpath including tests.
-
-;; TODO: use ordinary require and no eval, just forget about non-ns files
-
-(comment
-  (sniper.snarf/namespaces #"/Users/w01fe/prismatic")
-  (sniper.snarf/classpath-clojure-files #"^/Users/w01fe/prismatic")
-  (doseq [f (sniper.snarf/classpath-clojure-files #"^/Users/w01fe/prismatic")] (try (load-file f) (catch Exception e)))
+  (sniper.snarf/classpath-ns-forms #"^/Users/w01fe/prismatic")
+  (spit "/Users/w01fe/analysis.clj" @sniper.snarf/+analysis-cache+)
+  (def f (vec (sniper.snarf/classpath-ns-forms #"^/Users/w01fe/prismatic")))
   )

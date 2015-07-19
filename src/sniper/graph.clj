@@ -178,7 +178,6 @@
                          (map second non-loop-scc-edges))]
     (map #(safe-get scc-nodes %) leaf-sccs)))
 
-
 (defn dependency-graph
   ([] (->DependencyGraph #{} {} {}))
   ([forms]

@@ -23,17 +23,40 @@
 ;;   removal of anything dynamically extended.
 ;;   (they need to count as definitions also)
 ;; (this may be solved by treating them as shadow).
+;; (sort-of, results in helpers called from methods being thought dead.
+;;  now fixed for defmethod.)
 
 ;; TODO: shamalan-mode, coloring for strong set, depth in scc-graph.
 ;; for things in strong setk see centrality and roots.
 
 ;; TODO: orphaned test forms
+;; TODO: untested forms.
+;; TODO: see path to strong root, etc
+;;  (strong is just a special 'form'
+;; TODO: watch files and update
+;; TODO: dead files
+;; TODO: strong root list.
 
-(defn prepare-forms [forms]
+(defn prepare-forms [test-regex forms]
   (for [f forms]
-    (if (empty? (sniper/definitions f))
+    (if (or (empty? (sniper/definitions f))
+            (re-find test-regex (safe-get-in f [:source-info :file])))
       (assoc f :shadow? true)
       f)))
+
+(def +strong-root-var-regexes+
+  [#"deploy/prod"
+   #"/\$"
+   #"crane.task/"])
+
+(defonce +manual-strong-set+
+  (atom #{}))
+
+(defn strong-ref? [r]
+  (or (@+manual-strong-set+ r)
+      (and (symbol? r)
+           (let [s (str r)]
+             (some #(re-find % s) +strong-root-var-regexes+)))))
 
 (s/defschema KillableForm
   {:type (s/enum :leaf :leaf-cycle :collatoral)
@@ -49,9 +72,16 @@
 (def +state+ (atom nil))
 
 (defn aim []
-  (map (fn-> (update :form sniper/definitions) (update-in-when [:cause] sniper/definitions))
-       (:stack @+state+))
-  #_(concat (first (:stack @+state+))))
+  #_(map (fn-> (update :form sniper/definitions) (update-in-when [:cause] sniper/definitions))
+         (:stack @+state+))
+  (first (:stack @+state+)))
+
+(defnk aim->el [[:form [:source-info ^String file line column] var-defs] type {cause nil}]
+  (assert (.startsWith file "file:"))
+  (list (subs file 5)
+        line
+        column
+        (concat [type (first var-defs)] (when cause [cause]))))
 
 (defn start! [forms strong-ref? add-strong!]
   (let [g (graph/dependency-graph forms)
@@ -102,7 +132,19 @@
                        (next stack))))))
   (aim))
 
+
+(s/defn dead-namespaces :- [clojure.lang.Symbol]
+  "Return all namespaces where no forms are referenced from outside"
+  [forms]
+  ;; TODO
+  )
+
+
+
 (comment
-  (def f (mapcat sniper.snarf/ns-forms '[sniper.graph sniper.core sniper.scope]))
-  (sniper.scope/start! (sniper.scope/prepare-forms f) (constantly false) (constantly nil))
+  (def f (vec (sniper.snarf/classpath-ns-forms #"^/Users/w01fe/prismatic")))
+  (sniper.scope/start!
+   (sniper.scope/prepare-forms #"/test/" f)
+   sniper.scope/strong-ref?
+   #(swap! sniper.scope/+manual-strong-set+ conj %))
   )
