@@ -1,6 +1,7 @@
 (ns sniper.scope
   (:use plumbing.core)
   (:require
+   [clojure.java.shell :as shell]
    [schema.core :as s]
    [sniper.core :as sniper]
    [sniper.snarf :as snarf]
@@ -76,12 +77,26 @@
          (:stack @+state+))
   (first (:stack @+state+)))
 
-(defnk aim->el [[:form [:source-info ^String file line column] var-defs] type {cause nil}]
+(defn ref-count [s]
+  (letk [[exit ^String out] (shell/sh "ag" "-Q" s "/Users/w01fe/prismatic/")]
+    (if (= exit 1)
+      0
+      (count (.split out "\n")))))
+
+(defnk ref-counts [var-defs class-defs]
+  (for-map [s (concat
+               (map name var-defs)
+               (map #(last (.split ^String % "\\.")) class-defs))
+            :let [c (ref-count s)]
+            :when (pos? c)]
+    s c))
+
+(defnk aim->el [[:form [:source-info ^String file line column] var-defs :as form] type {cause nil}]
   (assert (.startsWith file "file:"))
   (list (subs file 5)
         line
         column
-        (concat [type (first var-defs)] (when cause [cause]))))
+        (concat [type (first var-defs) (ref-counts form)] (when cause [cause]))))
 
 (defn start! [forms strong-ref? add-strong!]
   (let [g (graph/dependency-graph forms)
