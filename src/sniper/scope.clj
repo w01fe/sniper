@@ -48,10 +48,23 @@
 (def +strong-root-var-regexes+
   [#"deploy/prod"
    #"/\$"
-   #"crane.task/"])
+   #"crane.task/"
+   #"topic-specs.admin/"
+   #"plumbing.schema.generative/"
+   #"data-warehouse.domain-schemas/"
+   #".test-utils/"
+   #"html-learn.readability/"
+   #"social-scores.repl/"
+   #"^hiphip."])
+
+(def +strong-set-file+ "/Users/w01fe/.sniper-strong.clj")
 
 (defonce +manual-strong-set+
-  (atom #{}))
+  (atom (set (map read-string (.split (slurp +strong-set-file+) "\n")))))
+
+(defn strongify! [s]
+  (swap! +manual-strong-set+ conj s)
+  (spit +strong-set-file+ (str (pr-str s) "\n") :append true))
 
 (defn strong-ref? [r]
   (or (@+manual-strong-set+ r)
@@ -161,5 +174,5 @@
   (sniper.scope/start!
    (sniper.scope/prepare-forms #"/test/" f)
    sniper.scope/strong-ref?
-   #(swap! sniper.scope/+manual-strong-set+ conj %))
+   sniper.scope/strongify!)
   )
