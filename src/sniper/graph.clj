@@ -99,6 +99,8 @@
 
 (declare dependency-graph ancestors descendants)
 
+(def sort-fn (comp (juxt :file :line) :source-info))
+
 (s/defrecord DependencyGraph
     [forms :- #{sniper/Form}
      definers :- RefMap
@@ -106,7 +108,7 @@
   PDependencyGraph
 
   (forms [this]
-    (sort-by (comp (juxt :file :line) :source-info) forms))
+    (sort-by sort-fn forms))
 
   (add-form [this f]
     (DependencyGraph.

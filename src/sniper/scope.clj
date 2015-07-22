@@ -119,12 +119,12 @@
      +state+
      {:graph g
       :add-strong! add-strong!
-      :stack (keep
-              (fn [forms]
-                (when-let [f (first (filter #(seq (sniper/definitions %)) forms))]
-                  {:form f
-                   :type (if (next forms) :leaf-cycle :leaf)}))
-              (graph/leaf-components g))}))
+      :stack (->> (graph/leaf-components g)
+                  (keep (fn [forms]
+                          (when-let [f (first (filter #(seq (sniper/definitions %)) forms))]
+                            {:form f
+                             :type (if (next forms) :leaf-cycle :leaf)})))
+                  (sort-by (comp graph/sort-fn :form)))}))
   (aim))
 
 (defn spare! []
