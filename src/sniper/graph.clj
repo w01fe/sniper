@@ -171,7 +171,7 @@
   (let [[scc-edges scc-nodes] (->> g
                                    forms
                                    (remove sniper/shadow?)
-                                   (mapcat (fn [f] (for [c (callees g f)] [f c])))
+                                   (mapcat (fn [f] (for [c (cons :none (callees g f))] [f c])))
                                    scc-graph)
         non-loop-scc-edges (remove (fn [[s d]] (= s d)) scc-edges)
         leaf-sccs (apply disj (set (map first non-loop-scc-edges))
