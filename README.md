@@ -35,6 +35,7 @@ Sniper understands shadow (e.g., test) forms, which behave as weak references, a
 
 When you delete a form, if there are dependants such as shadow forms or forms involved in a reference cycle, sniper walks you through removing this collatoral damage as well.  
  
+Sniper caches the results of analysis and the forms you mark as live, so while the first setup run on a project may be very slow (largely time in the analyzer), after making changes you can typically reanalyze a large codebase in seconds or less.  
 
 ## License
 
