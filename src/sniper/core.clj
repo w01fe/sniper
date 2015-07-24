@@ -1,7 +1,6 @@
 (ns sniper.core
   "Defines the core `Form` data type for sniper, which represents a top-level
    Clojure form, and its dependencies and dependents."
-
   (:use plumbing.core)
   (:require
    [schema.core :as s]))

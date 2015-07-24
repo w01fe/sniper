@@ -146,6 +146,15 @@
       (assoc f :shadow? true)
       f)))
 
+(defn- init-stack [g]
+  (->> (graph/leaf-components g)
+       (keep (fn [forms]
+               (when-let [f (first (filter #(seq (sniper/definitions %)) forms))]
+                 {:form f
+                  :type (if (next forms) :leaf-cycle :leaf)})))
+       (sort-by (comp graph/sort-fn :form))
+       reverse))
+
 (defn start!
   "Start a sniper session, by identifying a repo root, set of regexes to consider strong
    from the get-go, and test-regex to identify shadow forms.
@@ -170,24 +179,20 @@
      +state+
      {:repo-root repo-root
       :graph g
-      :stack (->> (graph/leaf-components g)
-                  (keep (fn [forms]
-                          (when-let [f (first (filter #(seq (sniper/definitions %)) forms))]
-                            {:form f
-                             :type (if (next forms) :leaf-cycle :leaf)})))
-                  (sort-by (comp graph/sort-fn :form))
-                  reverse)}))
+      :stack (init-stack g)}))
   (aim))
 
 (defn spare! []
   (letk [[graph stack :as state] @+state+
-         form (safe-get (first stack) :form)
-         defs (sniper/definitions form)]
+         [form type] (first stack)
+         defs (sniper/definitions form)
+         new-graph (reduce graph/strongify graph defs)]
+    (assert (not= type :collatoral) "Cannot spare form (already deleted a dependency)")
     (doseq [d defs] (strongify! d))
     (reset! +state+
             (assoc state
-              :graph (reduce graph/strongify graph defs)
-              :stack (next stack))))
+              :graph new-graph
+              :stack (vec (filter (set (graph/forms new-graph)) (next state))))))
   (aim))
 
 (defn fired! []
