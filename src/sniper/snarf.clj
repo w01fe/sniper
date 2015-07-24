@@ -1,23 +1,23 @@
 (ns sniper.snarf
-  "Snarf in namespaces and extract sniper.core/Forms with dependency info"
+  "Snarf in namespaces and extract sniper.core/Forms with dependency info.
+   Main entry point is `classpath-ns-forms`."
   (:use plumbing.core)
   (:require
    [clojure.java.classpath :as classpath]
    [clojure.java.io :as java-io]
+   [clojure.tools.analyzer.ast :as ast]
    [clojure.tools.analyzer.env :as env]
    [clojure.tools.analyzer.jvm :as jvm]
    [clojure.tools.analyzer.jvm.utils :as jvm-utils]
-   [clojure.tools.analyzer.passes.jvm.validate :as jvm-val]
-   [clojure.tools.analyzer.ast :as ast]
    [clojure.tools.namespace.find :as namespace-find]
    [clojure.tools.reader :as reader]
    [clojure.tools.reader.reader-types :as reader-types]
    [schema.core :as s]
    [sniper.core :as sniper]))
 
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Copied from tools.analyzer.jvm master for EOF fix.
-;; also modified to take file.
+;; Copied and modified from tools.analyzer.jvm master
 
 (defn try-analyze [form env opts]
   (try (jvm/analyze form env opts)
@@ -41,29 +41,30 @@
                                                " in def: " (:name ast)))})}))
   ([ns env opts]
      (println "Analyzing ns" ns)
-     (env/ensure (jvm/global-env)
-                 (let [res ^java.net.URL (jvm-utils/ns-url ns)]
-                   (assert res (str "Can't find " ns " in classpath"))
-                   (let [filename (str res)
-                         path     (.getPath res)]
-                     (when-not (get-in (env/deref-env) [::analyzed-clj path])
-                       (binding [*ns*   (the-ns ns)
-                                 *file* filename]
-                         (with-open [rdr (java-io/reader res)]
-                           (let [pbr (reader-types/indexing-push-back-reader
-                                      (java.io.PushbackReader. rdr) 1 filename)
-                                 eof (Object.)
-                                 read-opts {:eof eof :features #{:clj :t.a.jvm}}
-                                 read-opts (if (.endsWith filename "cljc")
-                                             (assoc read-opts :read-cond :allow)
-                                             read-opts)]
-                             (loop [ret []]
-                               (let [form (reader/read read-opts pbr)]
-                                 ;;(println "\n\n" form)
-                                 (if (identical? form eof)
-                                   (remove nil? ret)
-                                   (recur
-                                    (conj ret (try-analyze form (assoc env :ns (ns-name *ns*)) opts)))))))))))))))
+     (env/ensure
+      (jvm/global-env)
+      (let [res ^java.net.URL (jvm-utils/ns-url ns)]
+        (assert res (str "Can't find " ns " in classpath"))
+        (let [filename (str res)
+              path     (.getPath res)]
+          (when-not (get-in (env/deref-env) [::analyzed-clj path])
+            (binding [*ns*   (the-ns ns)
+                      *file* filename]
+              (with-open [rdr (java-io/reader res)]
+                (let [pbr (reader-types/indexing-push-back-reader
+                           (java.io.PushbackReader. rdr) 1 filename)
+                      eof (Object.)
+                      read-opts {:eof eof :features #{:clj :t.a.jvm}}
+                      read-opts (if (.endsWith filename "cljc")
+                                  (assoc read-opts :read-cond :allow)
+                                  read-opts)]
+                  (loop [ret []]
+                    (let [form (reader/read read-opts pbr)]
+                      ;;(println "\n\n" form)
+                      (if (identical? form eof)
+                        (remove nil? ret)
+                        (recur
+                         (conj ret (try-analyze form (assoc env :ns (ns-name *ns*)) opts)))))))))))))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Private helpers: extracting definitions and references from forms
@@ -117,6 +118,8 @@
 ;; Public
 
 (s/defn ^:always-validate normalized-form :- (s/maybe sniper/Form)
+  "Convert a top-level analyzer AST node into a sniper/Form.
+   May return nil for comment forms (which are often missing source info)."
   [ast-node]
   (let [nodes (ast/nodes ast-node)
         unique (fn [f] (sort-by str (distinct (mapcat f nodes))))]
@@ -131,9 +134,13 @@
        :var-refs (unique var-refs)
        :shadow? false})))
 
-(defonce +analysis-cache+ (atom (read-string (slurp "/Users/w01fe/analysis.clj"))) #_(atom {}))
+(def +analysis-cache-file+ ".sniper-analysis-cache.clj")
 
-(defn cached-ns-forms [ns]
+(defonce +analysis-cache+
+  (atom (try (read-string (slurp +analysis-cache-file+)) (catch Exception e {}))))
+
+(defn cached-ns-forms
+  [ns]
   (let [c (slurp (jvm-utils/ns-url ns))]
     (or (@+analysis-cache+ c)
         (let [res (vec (keep normalized-form (analyze-ns ns)))]
@@ -141,11 +148,13 @@
           res))))
 
 (s/defn ns-forms :- [sniper/Form]
+  "Get a flat sequence of forms for all namespaces in nss."
   [& nss :- [clojure.lang.Symbol]]
   (apply concat (pmap cached-ns-forms nss)))
 
 
 (defn classpath-namespaces [dir-regex]
+  "Get a sequence of all namespaces on classpath that match dir-regex."
   (->> (classpath/classpath)
        (mapcat file-seq)
        distinct
@@ -156,15 +165,13 @@
        distinct
        sort))
 
-(defn classpath-ns-forms [dir-regex]
+(s/defn classpath-ns-forms :- [sniper/Form]
+  [dir-regex]
+  "Get a flat sequence of forms for all namespaces on the classpath matching
+   dir-regex."
   (let [nss (classpath-namespaces dir-regex)]
     (println "Requiring" nss)
     (apply require nss)
-    (apply ns-forms nss)))
-
-
-(comment
-  (sniper.snarf/classpath-ns-forms #"^/Users/w01fe/prismatic")
-  (spit "/Users/w01fe/analysis.clj" @sniper.snarf/+analysis-cache+)
-  (def f (vec (sniper.snarf/classpath-ns-forms #"^/Users/w01fe/prismatic")))
-  )
+    (let [res (apply ns-forms nss)]
+      (future (spit +analysis-cache-file+ @+analysis-cache+))
+      res)))

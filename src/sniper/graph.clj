@@ -1,5 +1,5 @@
 (ns sniper.graph
-  "Build and maintain a dependency graph on Forms."
+  "Build and maintain a dependency graph on sniper.core/Forms."
   (:refer-clojure :exclude [ancestors descendants])
   (:use plumbing.core)
   (:require
@@ -23,7 +23,7 @@
   (strongify [this ref] "remove all forms contribute towards generating a ref from the graph"))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Helpers
+;;; Private: helpers
 
 (s/defschema RefMap
   {sniper/Ref #{sniper/Form}})
@@ -95,7 +95,7 @@
        sccs])))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;; Implementation
+;;; Public: Implementation
 
 (declare dependency-graph ancestors descendants)
 
@@ -163,7 +163,10 @@
   (dfs f #(callees g %)))
 
 (defn unused?
-  "Is this unused, except possibly by shadow forms?"
+  "Is this unused, except possibly by shadow forms?  Note that this may
+   return false for forms that particpate in a dependency cycle, none
+   of which are used outside that cycle.  To break these cycles, see
+   `leaf-components`."
   [g f]
   (every? sniper/shadow? (callers g f)))
 
@@ -189,15 +192,3 @@
 
 (defmethod print-method DependencyGraph [g writer]
   (print-method (forms g) writer))
-
-
-
-
-(comment
-  (->> (sniper.snarf/ns-forms 'sniper.snarf)
-       sniper.graph/dependency-graph
-       sniper.graph/minify
-       :forms
-       (mapv sniper.core/pretty-form)
-       pprint)
-  )
