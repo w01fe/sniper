@@ -38,6 +38,11 @@
 ;; TODO: dead files
 ;; TODO: strong root list.
 
+;; TODO: often erroneously considered dead:
+;;  - ^:const
+;;  - defprotocol
+;;  - extend-schema
+
 (defn prepare-forms [test-regex forms]
   (for [f forms]
     (if (or (empty? (sniper/definitions f))
@@ -124,7 +129,9 @@
                           (when-let [f (first (filter #(seq (sniper/definitions %)) forms))]
                             {:form f
                              :type (if (next forms) :leaf-cycle :leaf)})))
-                  (sort-by (comp graph/sort-fn :form)))}))
+                  (sort-by (comp graph/sort-fn :form))
+                  reverse
+                  )}))
   (aim))
 
 (defn spare! []
