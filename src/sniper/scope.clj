@@ -192,7 +192,7 @@
     (reset! +state+
             (assoc state
               :graph new-graph
-              :stack (vec (filter (set (graph/forms new-graph)) (next state))))))
+              :stack (vec (filter (comp (set (graph/forms new-graph)) :form) (next stack))))))
   (aim))
 
 (defn fired! []
