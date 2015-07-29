@@ -25,7 +25,7 @@
       fired! or press C-M-Backspace.  Any tests or other forms
       broken by this deletion will be added to the stack to be
       killed next (they are not spareable, and wil print as
-      :collatoral).  OR,
+      :collateral).  OR,
     - don't delete the form, and call spare! or press C-M-= to mark
       it as strong.
     - At any point, you can call (aim) or press C-M-' to see the current
@@ -89,9 +89,9 @@
 ;;; Private: maintaining scope state
 
 (s/defschema KillableForm
-  {:type (s/enum :leaf :leaf-cycle :collatoral)
+  {:type (s/enum :leaf :leaf-cycle :collateral)
    :form sniper/Form
-   (s/optional-key :cause) (s/named sniper/Form "Killed form that made this collatoral")})
+   (s/optional-key :cause) (s/named sniper/Form "Killed form that made this collateral")})
 
 (s/defschema State
   "State of the sniping process."
@@ -164,7 +164,7 @@
    desired cleanup) then call fired!, or call spare! to mark it as strong.  Either way
    the result will be an aim at the next target.
 
-   By default, traverses the repo bottom-up, jumping to immediately kill collatoral
+   By default, traverses the repo bottom-up, jumping to immediately kill collateral
    damage (e.g. tests of deleted forms)."
   [repo-root strong-regexes test-regex]
   (let [forms (prepare-forms
@@ -188,7 +188,7 @@
          [form type] (first stack)
          defs (sniper/definitions form)
          new-graph (reduce graph/strongify graph defs)]
-    (assert (not= type :collatoral) "Cannot spare form (already deleted a dependency)")
+    (assert (not= type :collateral) "Cannot spare form (already deleted a dependency)")
     (doseq [d defs] (strongify! d))
     (reset! +state+
             (assoc state
@@ -207,7 +207,7 @@
                       :form
                       (concat
                        (for [f (next (graph/ancestors graph form))]
-                         {:type :collatoral
+                         {:type :collateral
                           :form f
                           :cause form})
                        ;; TODO: this won't find new leaf cycles, for now just assume you restart
