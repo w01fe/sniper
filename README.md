@@ -6,7 +6,7 @@ See sniper.scope's namespace docstring for details for how to use it.
 
 The analysis is currently far from perfect, but we've used it to successfully delete about 10% of our 160KLOC codebase.  Contributions welcome.
 
-## Motivation and Features
+## Motivation
 
 Over the years we've accumulated lots of dead code mixed into our namespaces, and getting rid of it manually is a painful job.  At the same time, a fully automated solution won't work since there are lots of functions that aren't used that we want to keep.
 
