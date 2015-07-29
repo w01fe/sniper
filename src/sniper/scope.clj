@@ -1,17 +1,18 @@
 (ns sniper.scope
   "Driver for exploring the dead code in a project, one form at a time.
 
-   Stateful; intended to be used at the REPL within a project, or
-   with the provided sniper.el emacs mode.
+   Stateful; intended to be used at the REPL within a project, likely
+   complemented with the provided sniper.el emacs mode in the resources
+   directory.
 
    To set things up, the basic flow accomplished by start! is:
-     - You first read in a set of forms with sniper.snarf/classpath-ns-forms
+     - It first reads in a set of forms with sniper.snarf/classpath-ns-forms
      - Forms are marked as shadow if they have no definitions, or match
        a test regex.  This prevents us from considering all tests as
        dead, and from considering forms as used just because they are tested.
      - A dependency graph is constructed, an initial set of forms are
        marked as `strong` (based on regexes and symbols in the .sniper-strong.clj
-       file, removing them and all dependencies from the graph, and then
+       file), removing them and all dependencies from the graph, and then
        the graph is minified.
      - An initial set of potentially dead forms is identified, and a first
        form is returned.

@@ -53,8 +53,9 @@
     (vec (keys visited))))
 
 (defn scc-graph
-  "Take an edge list and return [edge-list node-set-map] for graph of sccs.
-   Pretends every node has self-loop.  Clusters returned will be in topological order.
+  "Take an edge list and return [edge-list node-set-map] for graph of strongly
+   connected components.  Pretends every node has self-loop.  Clusters returned
+   will be in topological order.
 
    ex: (= (scc-graph [[1 2] [2 3] [2 4] [4 2]])
           [[([0 1] [0 0] [1 2] [1 1] [2 2]) ; meta-edges
