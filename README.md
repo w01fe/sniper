@@ -32,7 +32,7 @@ See sniper.scope's namespace docstring for details, but the basic idea is:
  
 ## Features
 
-Sniper understands shadow (e.g., test) forms, which behave as weak references, and can also "garbage collect" dead code cycles which might appear live from a local perspective.  
+Sniper understands shadow (e.g., test) forms, which behave as weak references, and can also identify dead code cycles (a calls b, b calls a, nothing else calls either) which might appear live from a local perspective.  
 
 When you delete a form, if there are dependents such as shadow forms or forms involved in a reference cycle, sniper walks you through removing this collateral damage as well.  
  
