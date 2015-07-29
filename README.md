@@ -1,6 +1,6 @@
 # sniper
 
-A Clojure library designed to delete dead code, including an emacs mode.
+A Clojure library designed to delete dead code, aincluding an emacs mode.
 
 See sniper.scope's namespace docstring for details for how to use it.
 
@@ -11,7 +11,7 @@ The analysis is currently far from perfect, but we've used it to successfully de
 Over the years we've accumulated lots of dead code mixed into our namespaces, and getting rid of it manually is a painful job.  At the same time, a fully automated solution won't work since there are lots of functions that aren't used that we want to keep.
 
 My ideal workflow for this would be a tool-assisted, interactive loop, where:
- 1. the tool identifies a form that appers to be unused (except by tests)
+ 1. the tool identifies a form that appears to be unused (except by tests)
  2. the user decides to keep the form, or deletes it and does accompanying cleanup of the code
  
 I couldn't find any tools that met these criteria (and worked on our 160KLOC codebase), so I wrote sniper.  
@@ -33,7 +33,7 @@ See sniper.scope's namespace docstring for details, but the basic idea is:
 
 Sniper understands shadow (e.g., test) forms, which behave as weak references, and can also "garbage collect" dead code cycles which might appear live from a local perspective.  
 
-When you delete a form, if there are dependants such as shadow forms or forms involved in a reference cycle, sniper walks you through removing this collatoral damage as well.  
+When you delete a form, if there are dependents such as shadow forms or forms involved in a reference cycle, sniper walks you through removing this collateral damage as well.  
  
 Sniper caches the results of analysis and the forms you mark as live, so while the first setup run on a project may be very slow (largely time in the analyzer), after making changes you can typically reanalyze a large codebase in seconds or less.  
 
