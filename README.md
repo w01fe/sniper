@@ -1,6 +1,6 @@
 # sniper
 
-A Clojure library designed to delete dead code, including an emacs mode.
+A Clojure library designed to help you find and delete dead code, including an emacs mode.
 
 See sniper.scope's namespace docstring for details for how to use it.
 
