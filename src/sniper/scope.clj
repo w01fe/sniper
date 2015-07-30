@@ -1,11 +1,7 @@
 (ns sniper.scope
   "Driver for exploring the dead code in a project, one form at a time.
 
-   Stateful; intended to be used at the REPL within a project, likely
-   complemented with the provided sniper.el emacs mode in the resources
-   directory.
-
-   To set things up, the basic flow accomplished by start! is:
+   To set things up, call start!.  The basic flow accomplished by this is:
      - It first reads in a set of forms with sniper.snarf/classpath-ns-forms
      - Forms are marked as shadow if they have no definitions, or match
        a test regex.  This prevents us from considering all tests as

@@ -17,18 +17,19 @@ My ideal workflow for this would be a tool-assisted, interactive loop, where:
  
 I couldn't find any tools that met these criteria (and worked on our 160KLOC codebase), so I wrote sniper.  
 
-## How it works
+## How to use it
 
-See sniper.scope's namespace docstring for details, but the basic idea is: 
+See sniper.scope's namespace docstring for details, but the basic workflow is: 
 
- 1. You start a REPL that has all your code on the classpath
- 2. Sniper uses clojure.tools.analyzer to analyze the code, and find definitions and references from each form
+ 1. Start a REPL that has all your code on the classpath, in addition to sniper (leiningen `[w01fe/sniper "0.1.0-SNAPSHOT"]`).
+ 1. Require `sniper.scope` and call `sniper.scope/start!`. 
+ 1. Sniper uses clojure.tools.analyzer to analyze the code, and find definitions and references from each form
    - This phase still has some errors, which may lead to false positives or negatives later.
- 3. You tell sniper using regexes which forms are "shadow" (a.k.a. supporting).  For example, a test is a supporting form, 
+ 1. You tell sniper using regexes which forms are "shadow" (a.k.a. supporting).  For example, a test is a supporting form, 
     since the presence of a test doesn't prevent code from being dead.  
- 4. You tell sniper using regexes which forms are "strong" (a.k.a. used).  For example, you might include `#"-main$"` as 
+ 1. You tell sniper using regexes which forms are "strong" (a.k.a. used).  For example, you might include `#"-main$"` as 
     a strong regex.  
- 5. Then, you enter an interactive loop that takes you through the above workflow.  An included emacs mode can jump to each targeted form to allow you to quickly ascertain whether to kill or keep, and act accordingly.
+ 1. Then, you enter an interactive loop that takes you through the above workflow.  An included emacs mode can jump to each targeted form to allow you to quickly ascertain whether to kill or keep, and act accordingly.
  
 ## Features
 
