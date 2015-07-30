@@ -2,7 +2,7 @@
 
 A Clojure library designed to help you find and delete dead code, including an emacs mode.
 
-See sniper.scope's namespace docstring for details for how to use it.
+See the description below and sniper.scope's namespace docstring for details for how to use it.
 
 The analysis is currently far from perfect, but we've used it to successfully delete about 10% of our 160KLOC codebase.  Contributions welcome.
 
