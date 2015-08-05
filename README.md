@@ -1,8 +1,8 @@
 # sniper
 
-A Clojure library designed to delete dead code, including an emacs mode.
+A Clojure library designed to help you find and delete dead code, including an emacs mode.
 
-See sniper.scope's namespace docstring for details for how to use it.
+See the description below and sniper.scope's namespace docstring for details for how to use it.
 
 The analysis is currently far from perfect, but we've used it to successfully delete about 10% of our 160KLOC codebase.  Contributions welcome.
 
@@ -21,16 +21,42 @@ I couldn't find any tools that met these criteria (and worked on our 160KLOC cod
 
 See sniper.scope's namespace docstring for details, but the basic workflow is: 
 
- 1. Start a REPL that has all your code on the classpath, in addition to sniper (leiningen `[w01fe/sniper "0.1.0]`).
- 1. Require `sniper.scope` and call `sniper.scope/start!`. 
- 1. Sniper uses clojure.tools.analyzer to analyze the code, and find definitions and references from each form
-   - This phase still has some errors, which may lead to false positives or negatives later.
- 1. You tell sniper using regexes which forms are "shadow" (a.k.a. supporting).  For example, a test is a supporting form, 
-    since the presence of a test doesn't prevent code from being dead.  
- 1. You tell sniper using regexes which forms are "strong" (a.k.a. used).  For example, you might include `#"-main$"` as 
-    a strong regex.  
- 1. Then, you enter an interactive loop that takes you through the above workflow.  An included emacs mode can jump to each targeted form to allow you to quickly ascertain whether to kill or keep, and act accordingly.
- 
+ 1. Start a REPL that has all your code on the classpath, in addition to sniper (leiningen `[w01fe/sniper "0.1.0"]`).
+
+ 1. Require `sniper.scope` and call `sniper.scope/start!` with appropriate arguments. For example, 
+  
+ ```clojure
+   (require '[sniper.scope :as ss])
+   (sniper.scope/start!
+     "/Users/w01fe/my-repo"
+     [#"-main"
+      #"/\$"]
+     #"/test/")
+ ```
+    starts an interactive session removing unused code from `/users/w01fe/my-repo`, where all vars/classes
+    whose name matches `#"/-main"` or `#"/\$"` (e.g., fnhouse handlers) are considered "strong",
+    and all forms with a `test` in their file path are marked as "shadow" (i.e., supporting).
+
+   - First, `start!` uses clojure.tools.analyzer to analyze the code, and find definitions and references from each form.
+     - This may take awhile the first time, but results are cached so it should be much faster if you call it again 
+     - This phase still has some errors, which may lead to false positives or negatives later.
+   - Then, it runs a graph analysis on the full set of forms to find candidates for removal.  In this process:
+     - "strong" forms matching your regexes (or entries in the `.sniper-strong.clj` cache), as well as any forms 
+       they depend on, are never considered as candidates for deletion.
+     - "shadow" forms matching your file regex are not counted as references for the purpose of deciding if a 
+       form is dead or alive.  however, `sniper` still tracks them so that, e.g. if you delete a form, it guides you
+       through deleting its test as well.
+
+ 1. Then, you enter an interactive loop that takes you through the above workflow.  This is best experienced by loading the attached `resources/sniper.el` emacs mode and activating `M-x sniper-mode`, but can also be done at the repl:
+   - Type `C-M-'` to jump to the current target (or call `(ss/aim!)` at the repl and navigate there manually).
+   - Then either:
+     - Delete the code, do any additional cleanup desired, then press `C-M-backspace` (or call `(ss/fired!)`) to 
+       tell sniper about your decision.  If using `sniper.el`, it will immediately aim at the next target.
+     - Decide to keep the form, and press `C-M-=` (or call `(ss/spare!)` to tell sniper about it.  This decision will be cached to the `.sniper-strong.clj` file, and sniper will aim at the next target.
+   - Repeat until there is nothing left to remove.  Didn't that feel good?!
+   - If at any point you want to pause, or something gets confused, you can always call `start!` again with the same arguments to pick back up.  Both the analysis and your decisions are cached on disk.
+    
+
 ## Features
 
 Sniper understands shadow (e.g., test) forms, which behave as weak references, and can also identify dead code cycles (a calls b, b calls a, nothing else calls either) which might appear live from a local perspective.  
