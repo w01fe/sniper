@@ -1,4 +1,4 @@
-(defproject w01fe/sniper "0.1.0-SNAPSHOT"
+(defproject w01fe/sniper "0.1.0"
   :description "Snipe at dead code"
   :url "https://github.com/w01fe/sniper"
   :license {:name "Eclipse Public License"
