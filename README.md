@@ -21,7 +21,7 @@ I couldn't find any tools that met these criteria (and worked on our 160KLOC cod
 
 See sniper.scope's namespace docstring for details, but the basic workflow is: 
 
- 1. Start a REPL that has all your code on the classpath, in addition to sniper (leiningen `[w01fe/sniper "0.1.0-SNAPSHOT"]`).
+ 1. Start a REPL that has all your code on the classpath, in addition to sniper (leiningen `[w01fe/sniper "0.1.0]`).
  1. Require `sniper.scope` and call `sniper.scope/start!`. 
  1. Sniper uses clojure.tools.analyzer to analyze the code, and find definitions and references from each form
    - This phase still has some errors, which may lead to false positives or negatives later.
